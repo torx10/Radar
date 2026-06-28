@@ -11,11 +11,19 @@
 namespace RadarRender {
 
 struct WalkableBake {
+    struct BoundarySegment {
+        uint16_t x0 = 0;
+        uint16_t y0 = 0;
+        uint16_t x1 = 0;
+        uint16_t y1 = 0;
+    };
+
     int                       width = 0;
     int                       height = 0;
     const uint8_t*            sourcePtr = nullptr;
     std::vector<uint8_t>      walkableMask;
     std::vector<uint8_t>      baseEdgeMask;
+    std::vector<BoundarySegment> boundarySegments;
     bool                      valid = false;
 
     void Clear() {
@@ -24,6 +32,7 @@ struct WalkableBake {
         sourcePtr = nullptr;
         walkableMask.clear();
         baseEdgeMask.clear();
+        boundarySegments.clear();
         valid = false;
     }
 
@@ -91,6 +100,7 @@ struct WalkableBake {
         }
 
         baseEdgeMask.assign(cellCount, 0);
+        boundarySegments.clear();
         bool anyWalkable = false;
         for (int gy = 0; gy < h; ++gy) {
             for (int gx = 0; gx < w; ++gx) {
@@ -98,7 +108,38 @@ struct WalkableBake {
                                  + static_cast<size_t>(gx);
                 if (walkableMask[idx] == 0) continue;
                 anyWalkable = true;
-                if (IsBoundaryCell(walkableMask, w, h, gx, gy)) baseEdgeMask[idx] = 1;
+                if (!IsBoundaryCell(walkableMask, w, h, gx, gy)) continue;
+
+                baseEdgeMask[idx] = 1;
+
+                if (!IsWalkable(gx, gy - 1))
+                    boundarySegments.push_back(BoundarySegment{
+                        static_cast<uint16_t>(gx),
+                        static_cast<uint16_t>(gy),
+                        static_cast<uint16_t>(gx + 1),
+                        static_cast<uint16_t>(gy),
+                    });
+                if (!IsWalkable(gx + 1, gy))
+                    boundarySegments.push_back(BoundarySegment{
+                        static_cast<uint16_t>(gx + 1),
+                        static_cast<uint16_t>(gy),
+                        static_cast<uint16_t>(gx + 1),
+                        static_cast<uint16_t>(gy + 1),
+                    });
+                if (!IsWalkable(gx, gy + 1))
+                    boundarySegments.push_back(BoundarySegment{
+                        static_cast<uint16_t>(gx),
+                        static_cast<uint16_t>(gy + 1),
+                        static_cast<uint16_t>(gx + 1),
+                        static_cast<uint16_t>(gy + 1),
+                    });
+                if (!IsWalkable(gx - 1, gy))
+                    boundarySegments.push_back(BoundarySegment{
+                        static_cast<uint16_t>(gx),
+                        static_cast<uint16_t>(gy),
+                        static_cast<uint16_t>(gx),
+                        static_cast<uint16_t>(gy + 1),
+                    });
             }
         }
 

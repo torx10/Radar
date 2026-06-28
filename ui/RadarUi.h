@@ -120,6 +120,23 @@ inline void DrawShapePicker(UiState& ui) {
 }
 
 inline void DrawGeneralTab(RadarData::RadarConfig& cfg, UiState& ui) {
+    auto drawTerrainRenderStyleCombo = [&](const char* label) {
+        const char* preview = RadarData::TerrainRenderStyleName(cfg.TerrainStyle);
+        ImGui::SetNextItemWidth(240.f);
+        if (!ImGui::BeginCombo(label, preview, ImGuiComboFlags_HeightLargest)) return;
+
+        const auto drawOption = [&](RadarData::TerrainRenderStyle style) {
+            const bool selected = cfg.TerrainStyle == style;
+            if (ImGui::Selectable(RadarData::TerrainRenderStyleName(style), selected))
+                cfg.TerrainStyle = style;
+            if (selected) ImGui::SetItemDefaultFocus();
+        };
+
+        drawOption(RadarData::TerrainRenderStyle::Texture);
+        drawOption(RadarData::TerrainRenderStyle::DotMatrix);
+        drawOption(RadarData::TerrainRenderStyle::TextureAndDotMatrix);
+        ImGui::EndCombo();
+    };
     auto drawTerrainAlignmentCombo = [&](const char* label) {
         const char* preview = RadarData::TerrainTextureAlignmentModeName(cfg.TerrainAlignment);
         ImGui::SetNextItemWidth(240.f);
@@ -137,30 +154,81 @@ inline void DrawGeneralTab(RadarData::RadarConfig& cfg, UiState& ui) {
         drawOption(RadarData::TerrainTextureAlignmentMode::ZeroBased);
         ImGui::EndCombo();
     };
+    auto drawTerrainHeightModeCombo = [&](const char* label) {
+        const char* preview = RadarData::TerrainProjectionHeightModeName(cfg.TerrainHeightMode);
+        ImGui::SetNextItemWidth(240.f);
+        if (!ImGui::BeginCombo(label, preview, ImGuiComboFlags_HeightLargest)) return;
+
+        const auto drawOption = [&](RadarData::TerrainProjectionHeightMode mode) {
+            const bool selected = cfg.TerrainHeightMode == mode;
+            if (ImGui::Selectable(RadarData::TerrainProjectionHeightModeName(mode), selected))
+                cfg.TerrainHeightMode = mode;
+            if (selected) ImGui::SetItemDefaultFocus();
+        };
+
+        drawOption(RadarData::TerrainProjectionHeightMode::Legacy);
+        drawOption(RadarData::TerrainProjectionHeightMode::Flat);
+        drawOption(RadarData::TerrainProjectionHeightMode::RelativeToPlayer);
+        drawOption(RadarData::TerrainProjectionHeightMode::FlatPlayerAnchored);
+        ImGui::EndCombo();
+    };
 
     bool en = cfg.OverlayEnabled;
     if (ImGui::Checkbox("Enable Radar Overlay", &en)) cfg.OverlayEnabled = en;
     ImGui::Separator();
 
     if (ImGui::CollapsingHeader("Terrain Overlay", ImGuiTreeNodeFlags_DefaultOpen)) {
+        const bool usesTexture = cfg.TerrainStyle == RadarData::TerrainRenderStyle::Texture
+                                 || cfg.TerrainStyle == RadarData::TerrainRenderStyle::TextureAndDotMatrix;
+        const bool usesDot = cfg.TerrainStyle == RadarData::TerrainRenderStyle::DotMatrix
+                             || cfg.TerrainStyle == RadarData::TerrainRenderStyle::TextureAndDotMatrix;
         ImGui::Indent(12.f);
         ImGui::Checkbox("Enable Terrain Overlay", &cfg.DrawWalkableMap);
+        ImGui::Checkbox("Show Terrain on Minimap", &cfg.DrawMiniMapTerrain);
         ImGui::BeginDisabled(!cfg.DrawWalkableMap);
-        ImGui::SetNextItemWidth(240.f);
-        ImGui::ColorEdit4("Interior Fill", &cfg.WalkableMapInteriorColor.x,
-                          ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar);
-        ImGui::SetNextItemWidth(240.f);
-        ImGui::ColorEdit4("Wall Edge", &cfg.WalkableMapEdgeColor.x,
-                          ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar);
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted("Edge Thickness");
-        ImGui::SameLine(160.f);
-        ImGui::SetNextItemWidth(140.f);
-        ImGui::SliderInt("##EdgeThickness", &cfg.WalkableMapBorderThickness, 0, 8, "%d");
-        drawTerrainAlignmentCombo("Terrain Alignment");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Use this to test texture/cell alignment. "
-                              "Cell-centred should usually align texels to walkable grid samples.");
+        drawTerrainRenderStyleCombo("Terrain Render Style");
+        if (usesTexture) {
+            ImGui::SetNextItemWidth(240.f);
+            ImGui::ColorEdit4("Texture Interior Fill", &cfg.TextureInteriorColor.x,
+                              ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar);
+            ImGui::SetNextItemWidth(240.f);
+            ImGui::ColorEdit4("Texture Wall Edge", &cfg.TextureWallEdgeColor.x,
+                              ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar);
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("Edge Thickness");
+            ImGui::SameLine(160.f);
+            ImGui::SetNextItemWidth(140.f);
+            ImGui::SliderInt("##EdgeThickness", &cfg.WalkableMapBorderThickness, 0, 8, "%d");
+        }
+        if (usesDot) {
+            ImGui::SetNextItemWidth(240.f);
+            ImGui::ColorEdit4("Dot Matrix Fill", &cfg.DotMatrixFillColor.x,
+                              ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar);
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("Dot Cell Step");
+            ImGui::SameLine(160.f);
+            ImGui::SetNextItemWidth(140.f);
+            ImGui::SliderInt("##DotCellStep", &cfg.DotCellStep, 1, 16, "%d");
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted("Dot Size");
+            ImGui::SameLine(160.f);
+            ImGui::SetNextItemWidth(140.f);
+            ImGui::SliderFloat("##DotSize", &cfg.DotSize, 0.5f, 6.0f, "%.1f");
+        }
+        if (ImGui::CollapsingHeader("Debug / Advanced")) {
+            drawTerrainAlignmentCombo("Terrain Alignment");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Use this to test texture/cell alignment. "
+                                  "Cell-centred should usually align texels to walkable grid samples.");
+            }
+            ImGui::TextDisabled("Diagnostic only:");
+            drawTerrainHeightModeCombo("Terrain Height Mode");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Legacy uses sampled terrain height. "
+                                  "Flat ignores Z for terrain only and is diagnostic because it can misalign terrain "
+                                  "relative to map markers across elevation changes.");
+            }
+            ImGui::TextWrapped("Flat / Player Anchored projects terrain flat, then anchors it to the player's normal map position. Useful when Flat / Ignore Z floats away from the player.");
         }
         ImGui::EndDisabled();
         ImGui::Unindent(12.f);
@@ -171,7 +239,6 @@ inline void DrawGeneralTab(RadarData::RadarConfig& cfg, UiState& ui) {
 
     if (ImGui::CollapsingHeader("Minimap Radar", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::Indent(12.f);
-        ImGui::Checkbox("Show Terrain on Minimap", &cfg.DrawMiniMapTerrain);
         ImGui::Checkbox("Enemies", &cfg.DrawMiniMapEntities);
         ImGui::Unindent(12.f);
     }

@@ -27,6 +27,60 @@ inline const char* TerrainTextureAlignmentModeName(TerrainTextureAlignmentMode m
     }
 }
 
+enum class TerrainProjectionHeightMode : int {
+    Legacy = 0,
+    Flat = 1,
+    RelativeToPlayer = 2,
+    FlatPlayerAnchored = 3,
+};
+
+inline const char* TerrainProjectionHeightModeName(TerrainProjectionHeightMode mode) {
+    switch (mode) {
+        case TerrainProjectionHeightMode::Flat:
+            return "Flat / Ignore Z";
+        case TerrainProjectionHeightMode::RelativeToPlayer:
+            return "Relative to Player Z";
+        case TerrainProjectionHeightMode::FlatPlayerAnchored:
+            return "Flat / Player Anchored";
+        default:
+            return "Terrain Height / Legacy";
+    }
+}
+
+enum class TerrainProjectionMode : int {
+    Normal = 0,
+    SdkOnly = 1,
+    FallbackOnly = 2,
+};
+
+inline const char* TerrainProjectionModeName(TerrainProjectionMode mode) {
+    switch (mode) {
+        case TerrainProjectionMode::SdkOnly:
+            return "SDK Only";
+        case TerrainProjectionMode::FallbackOnly:
+            return "Fallback Only";
+        default:
+            return "Normal";
+    }
+}
+
+enum class TerrainRenderStyle : int {
+    Texture = 0,
+    DotMatrix = 1,
+    TextureAndDotMatrix = 2,
+};
+
+inline const char* TerrainRenderStyleName(TerrainRenderStyle style) {
+    switch (style) {
+        case TerrainRenderStyle::DotMatrix:
+            return "Dot Matrix";
+        case TerrainRenderStyle::TextureAndDotMatrix:
+            return "Texture + Dot Matrix";
+        default:
+            return "Texture";
+    }
+}
+
 inline Rgba8 ParseRgbString(const std::string& s, Rgba8 fallback = {}) {
     int r = fallback.r, g = fallback.g, b = fallback.b;
     if (sscanf_s(s.c_str(), "%d, %d, %d", &r, &g, &b) >= 3
@@ -46,8 +100,12 @@ struct RadarConfig {
     bool  DrawMiniMapTerrain = true;
     bool  DrawMiniMapEntities = true;
     int   WalkableMapBorderThickness = 0;
+    TerrainRenderStyle TerrainStyle = TerrainRenderStyle::Texture;
     TerrainTextureAlignmentMode TerrainAlignment = TerrainTextureAlignmentMode::Legacy;
-    int   WalkableDecimation = 4;
+    TerrainProjectionHeightMode TerrainHeightMode = TerrainProjectionHeightMode::Legacy;
+    TerrainProjectionMode TerrainProjection = TerrainProjectionMode::Normal;
+    int   DotCellStep = 2;
+    float DotSize = 1.5f;
     bool  ShowPlayerNames = false;
     bool  ShowImportantPOI = true;
     bool  DrawPoiIcons = false;
@@ -56,8 +114,9 @@ struct RadarConfig {
     bool  EdgeIndicatorLargemap = true;
     bool  UseLegacyClassifier = false;
     float LargeMapScaleMultiplier = 0.1738f;
-    ImVec4 WalkableMapInteriorColor{0.46f, 0.46f, 0.46f, 0.7f};
-    ImVec4 WalkableMapEdgeColor{60.0f / 255.0f, 220.0f / 255.0f, 1.0f, 180.0f / 255.0f};
+    ImVec4 TextureInteriorColor{0.46f, 0.46f, 0.46f, 0.7f};
+    ImVec4 TextureWallEdgeColor{60.0f / 255.0f, 220.0f / 255.0f, 1.0f, 180.0f / 255.0f};
+    ImVec4 DotMatrixFillColor{0.46f, 0.46f, 0.46f, 0.7f};
     ImVec4 POIColor{1.f, 1.f, 0.5f, 1.f};
     int   MaxEntitiesDrawn = 512;
     ImVec2 MainMenuSize{900.f, 600.f};
@@ -87,9 +146,16 @@ struct RadarConfig {
         DrawMiniMapEntities = j.value("DrawMiniMapEntities", DrawMiniMapEntities);
         WalkableMapBorderThickness =
             std::clamp(j.value("WalkableMapBorderThickness", WalkableMapBorderThickness), 0, 8);
+        TerrainStyle = static_cast<TerrainRenderStyle>(
+            std::clamp(j.value("TerrainStyle", static_cast<int>(TerrainStyle)), 0, 2));
         TerrainAlignment = static_cast<TerrainTextureAlignmentMode>(
             std::clamp(j.value("TerrainAlignment", static_cast<int>(TerrainAlignment)), 0, 2));
-        WalkableDecimation = std::clamp(j.value("WalkableDecimation", WalkableDecimation), 2, 16);
+        TerrainHeightMode = static_cast<TerrainProjectionHeightMode>(
+            std::clamp(j.value("TerrainHeightMode", static_cast<int>(TerrainHeightMode)), 0, 3));
+        TerrainProjection = static_cast<TerrainProjectionMode>(
+            std::clamp(j.value("TerrainProjection", static_cast<int>(TerrainProjection)), 0, 2));
+        DotCellStep = std::clamp(j.value("DotCellStep", j.value("WalkableDecimation", DotCellStep)), 1, 16);
+        DotSize = std::clamp(j.value("DotSize", DotSize), 0.5f, 6.0f);
         ShowPlayerNames = j.value("ShowPlayerNames", ShowPlayerNames);
         ShowImportantPOI = j.value("ShowImportantPOI", ShowImportantPOI);
         DrawPoiIcons = j.value("DrawPoiIcons", DrawPoiIcons);
@@ -99,10 +165,16 @@ struct RadarConfig {
         UseLegacyClassifier = j.value("UseLegacyClassifier", UseLegacyClassifier);
         LargeMapScaleMultiplier = j.value("LargeMapScaleMultiplier", LargeMapScaleMultiplier);
         MaxEntitiesDrawn = std::clamp(j.value("MaxEntitiesDrawn", MaxEntitiesDrawn), 64, 4096);
-        const bool hasInteriorColor = readColor("WalkableMapInteriorColor", WalkableMapInteriorColor);
-        if (!hasInteriorColor)
-            readColor("WalkableMapColor", WalkableMapInteriorColor);
-        readColor("WalkableMapEdgeColor", WalkableMapEdgeColor);
+        const bool hasTextureInterior = readColor("TextureInteriorColor", TextureInteriorColor);
+        if (!hasTextureInterior) {
+            const bool hasLegacyInterior = readColor("WalkableMapInteriorColor", TextureInteriorColor);
+            if (!hasLegacyInterior)
+                readColor("WalkableMapColor", TextureInteriorColor);
+        }
+        if (!readColor("TextureWallEdgeColor", TextureWallEdgeColor))
+            readColor("WalkableMapEdgeColor", TextureWallEdgeColor);
+        if (!readColor("DotMatrixFillColor", DotMatrixFillColor))
+            DotMatrixFillColor = TextureInteriorColor;
         readColor("POIColor", POIColor);
         if (j.contains("MainMenuSize") && j["MainMenuSize"].is_array()
             && j["MainMenuSize"].size() >= 2) {
@@ -125,8 +197,13 @@ struct RadarConfig {
         j["DrawMiniMapTerrain"] = DrawMiniMapTerrain;
         j["DrawMiniMapEntities"] = DrawMiniMapEntities;
         j["WalkableMapBorderThickness"] = WalkableMapBorderThickness;
+        j["TerrainStyle"] = static_cast<int>(TerrainStyle);
         j["TerrainAlignment"] = static_cast<int>(TerrainAlignment);
-        j["WalkableDecimation"] = WalkableDecimation;
+        j["TerrainHeightMode"] = static_cast<int>(TerrainHeightMode);
+        j["TerrainProjection"] = static_cast<int>(TerrainProjection);
+        j["DotCellStep"] = DotCellStep;
+        j["DotSize"] = DotSize;
+        j["WalkableDecimation"] = DotCellStep;
         j["ShowPlayerNames"] = ShowPlayerNames;
         j["ShowImportantPOI"] = ShowImportantPOI;
         j["DrawPoiIcons"] = DrawPoiIcons;
@@ -136,12 +213,18 @@ struct RadarConfig {
         j["UseLegacyClassifier"] = UseLegacyClassifier;
         j["LargeMapScaleMultiplier"] = LargeMapScaleMultiplier;
         j["MaxEntitiesDrawn"] = MaxEntitiesDrawn;
-        j["WalkableMapInteriorColor"] = {WalkableMapInteriorColor.x, WalkableMapInteriorColor.y,
-                                          WalkableMapInteriorColor.z, WalkableMapInteriorColor.w};
-        j["WalkableMapEdgeColor"] = {WalkableMapEdgeColor.x, WalkableMapEdgeColor.y,
-                                      WalkableMapEdgeColor.z, WalkableMapEdgeColor.w};
-        j["WalkableMapColor"] = {WalkableMapInteriorColor.x, WalkableMapInteriorColor.y,
-                                  WalkableMapInteriorColor.z, WalkableMapInteriorColor.w};
+        j["TextureInteriorColor"] = {TextureInteriorColor.x, TextureInteriorColor.y,
+                                      TextureInteriorColor.z, TextureInteriorColor.w};
+        j["TextureWallEdgeColor"] = {TextureWallEdgeColor.x, TextureWallEdgeColor.y,
+                                      TextureWallEdgeColor.z, TextureWallEdgeColor.w};
+        j["DotMatrixFillColor"] = {DotMatrixFillColor.x, DotMatrixFillColor.y,
+                                    DotMatrixFillColor.z, DotMatrixFillColor.w};
+        j["WalkableMapInteriorColor"] = {TextureInteriorColor.x, TextureInteriorColor.y,
+                                          TextureInteriorColor.z, TextureInteriorColor.w};
+        j["WalkableMapEdgeColor"] = {TextureWallEdgeColor.x, TextureWallEdgeColor.y,
+                                      TextureWallEdgeColor.z, TextureWallEdgeColor.w};
+        j["WalkableMapColor"] = {TextureInteriorColor.x, TextureInteriorColor.y,
+                                  TextureInteriorColor.z, TextureInteriorColor.w};
         j["POIColor"] = {POIColor.x, POIColor.y, POIColor.z, POIColor.w};
         j["MainMenuSize"] = {MainMenuSize.x, MainMenuSize.y};
         std::ofstream out(path);

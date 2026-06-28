@@ -37,7 +37,7 @@ public:
     bool EnsureBuilt(void* d3dDevice, const WalkableBake& bake, const RadarData::RadarConfig& cfg,
                      uint64_t areaCounter, const uint8_t* walkablePtr) {
         if (!d3dDevice || !bake.valid || bake.width <= 0 || bake.height <= 0
-            || bake.walkableMask.empty() || bake.baseEdgeMask.empty()) {
+            || bake.walkableMask.empty()) {
             Release();
             return false;
         }
@@ -66,20 +66,14 @@ private:
 
     struct PackedStyle {
         PackedColor interior;
-        PackedColor edge;
-        uint8_t     edgeRadius = 1;
 
         bool operator==(const PackedStyle& other) const {
-            return interior == other.interior && edge == other.edge
-                   && edgeRadius == other.edgeRadius;
+            return interior == other.interior;
         }
 
         static PackedStyle FromConfig(const RadarData::RadarConfig& cfg) {
             PackedStyle out;
-            out.interior = PackColor(cfg.WalkableMapInteriorColor);
-            out.edge = PackColor(cfg.WalkableMapEdgeColor);
-            out.edgeRadius = static_cast<uint8_t>(
-                std::clamp(1 + cfg.WalkableMapBorderThickness, 1, 16));
+            out.interior = PackColor(cfg.TextureInteriorColor);
             return out;
         }
 
@@ -100,58 +94,14 @@ private:
 
     bool Build(void* d3dDevice, const WalkableBake& bake, const PackedStyle& style,
                uint64_t areaCounter, const uint8_t* walkablePtr) {
-        m_edgeMask = bake.baseEdgeMask;
-        if (style.edgeRadius > 1) {
-            m_frontier = m_edgeMask;
-            m_nextFrontier.assign(m_edgeMask.size(), 0);
-            for (uint8_t step = 1; step < style.edgeRadius; ++step) {
-                std::fill(m_nextFrontier.begin(), m_nextFrontier.end(), 0);
-                bool expanded = false;
-                for (int gy = 0; gy < bake.height; ++gy) {
-                    for (int gx = 0; gx < bake.width; ++gx) {
-                        const size_t idx = static_cast<size_t>(gy) * static_cast<size_t>(bake.width)
-                                         + static_cast<size_t>(gx);
-                        if (bake.walkableMask[idx] == 0 || m_edgeMask[idx] != 0) continue;
-
-                        bool touchesFrontier = false;
-                        for (int dy = -1; dy <= 1 && !touchesFrontier; ++dy) {
-                            const int ny = gy + dy;
-                            if (ny < 0 || ny >= bake.height) continue;
-                            for (int dx = -1; dx <= 1; ++dx) {
-                                if (dx == 0 && dy == 0) continue;
-                                const int nx = gx + dx;
-                                if (nx < 0 || nx >= bake.width) continue;
-                                const size_t nidx =
-                                    static_cast<size_t>(ny) * static_cast<size_t>(bake.width)
-                                    + static_cast<size_t>(nx);
-                                if (m_frontier[nidx] != 0) {
-                                    touchesFrontier = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (!touchesFrontier) continue;
-                        m_nextFrontier[idx] = 1;
-                        m_edgeMask[idx] = 1;
-                        expanded = true;
-                    }
-                }
-
-                if (!expanded) break;
-                m_frontier.swap(m_nextFrontier);
-            }
-        }
-
         m_pixels.assign(bake.CellCount() * 4, 0);
         for (size_t idx = 0; idx < bake.walkableMask.size(); ++idx) {
             if (bake.walkableMask[idx] == 0) continue;
-            const PackedColor& color = m_edgeMask[idx] != 0 ? style.edge : style.interior;
             const size_t px = idx * 4;
-            m_pixels[px + 0] = color.r;
-            m_pixels[px + 1] = color.g;
-            m_pixels[px + 2] = color.b;
-            m_pixels[px + 3] = color.a;
+            m_pixels[px + 0] = style.interior.r;
+            m_pixels[px + 1] = style.interior.g;
+            m_pixels[px + 2] = style.interior.b;
+            m_pixels[px + 3] = style.interior.a;
         }
 
         auto* dev = static_cast<ID3D11Device*>(d3dDevice);
@@ -207,9 +157,6 @@ private:
     uint64_t                  m_areaCounter = 0;
     const uint8_t*            m_walkablePtr = nullptr;
     PackedStyle               m_style{};
-    std::vector<uint8_t>      m_edgeMask;
-    std::vector<uint8_t>      m_frontier;
-    std::vector<uint8_t>      m_nextFrontier;
     std::vector<uint8_t>      m_pixels;
 };
 

@@ -38,8 +38,9 @@ inline void TryMigrateFromHost(const std::filesystem::path& pluginDir,
             if (j.contains("WalkableMapColor") && j["WalkableMapColor"].is_array()
                 && j["WalkableMapColor"].size() >= 4) {
                 auto& a = j["WalkableMapColor"];
-                cfg.WalkableMapInteriorColor = ImVec4(a[0].get<float>(), a[1].get<float>(),
-                                                      a[2].get<float>(), a[3].get<float>());
+                cfg.TextureInteriorColor = ImVec4(a[0].get<float>(), a[1].get<float>(),
+                                                  a[2].get<float>(), a[3].get<float>());
+                cfg.DotMatrixFillColor = cfg.TextureInteriorColor;
             }
             if (j.contains("POIColor") && j["POIColor"].is_array() && j["POIColor"].size() >= 4) {
                 auto& a = j["POIColor"];
