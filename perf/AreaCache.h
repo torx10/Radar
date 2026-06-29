@@ -99,10 +99,12 @@ struct AreaCacheState {
                     PluginSDK::WalkableGridHandle& gridHandle,
                     const RadarData::RadarConfig& cfg, const RadarData::TargetDatabase& db,
                             const RadarData::IconTables& icons) {
+        const bool areaChanged = snap.AreaChangeCounter != areaCounter;
         areaCounter = snap.AreaChangeCounter;
         walkablePtr = gridHandle.Data();
         walkable.Rebuild(ctx, gridHandle, cfg);
         pois.Rebuild(ctx, snap, cfg, db, icons);
+        if (areaChanged) entities.Clear();
         entities.Rebuild(ctx, snap, cfg, db, icons);
         entitySnapshotTime = snap.LastUpdateTime;
         poiDirty = false;

@@ -211,6 +211,7 @@ struct DisplayRule {
     Rgba8                    markerColor{255, 217, 38, 255};
     float                    size = 6.f;
     std::string              label;
+    bool                     rememberUntilZone = false;
     // Persisted/exposed for future GPS/pathing work; runtime matching does not use this yet.
     bool                     navigable = false;
 };

@@ -869,11 +869,19 @@ inline void DrawRuleColorSourceCombo(const char* id, bool& useRuneshapeColor) {
 inline void DrawDisplayRuleStyleRow(bool hideEditable, bool& hideValue,
                                     RadarData::MarkerShape& shape, RadarData::Rgba8& color,
                                     float& size, bool labelEditable, std::string& label,
+                                    bool* rememberUntilZone = nullptr,
                                     bool showRuneshapeColorSource = false,
                                     bool* useRuneshapeColor = nullptr) {
     ImGui::BeginDisabled(!hideEditable);
     ImGui::Checkbox("Hide", &hideValue);
     ImGui::EndDisabled();
+    if (rememberUntilZone) {
+        ImGui::SameLine();
+        ImGui::Checkbox("Remember Discovered", rememberUntilZone);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("When this rule matches an entity, keep showing its last known marker location until you change zone.");
+        }
+    }
     ImGui::SameLine();
     DrawInlineRuleLabel("Marker");
     ImGui::SetNextItemWidth(132.f);
@@ -1035,7 +1043,8 @@ inline void DrawDisplayRuleRow(size_t index, RadarData::IconTables& icons, RuleS
         DrawDisplayRuleMatcherFields(rule, true, true, "##cat");
         const bool runeshapeEligible = RadarData::IsRuneshapeColourEligible(rule);
         DrawDisplayRuleStyleRow(true, rule.hide, rule.markerShape, rule.markerColor, rule.size,
-                                true, rule.label, runeshapeEligible, &rule.useRuneshapeColor);
+                                true, rule.label, &rule.rememberUntilZone,
+                                runeshapeEligible, &rule.useRuneshapeColor);
         ImGui::TreePop();
     }
     PopRuleCardStyle();

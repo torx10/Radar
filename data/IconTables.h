@@ -136,6 +136,7 @@ struct IconTables {
         rule.useRuneshapeColor = j.value("UseRuneshapeColor", false);
         rule.size = j.value("Size", 6.f);
         rule.label = j.value("Label", std::string{});
+        rule.rememberUntilZone = j.value("RememberUntilZone", false);
         rule.navigable = j.value("Navigable", false);
         if (j.contains("Color") && j["Color"].is_array() && j["Color"].size() >= 4) {
             auto& a = j["Color"];
@@ -169,6 +170,7 @@ struct IconTables {
                 {"Color", WriteColor(rule.markerColor)},
                 {"Size", rule.size},
                 {"Label", rule.label},
+                {"RememberUntilZone", rule.rememberUntilZone},
                 {"Navigable", rule.navigable}};
     }
 
