@@ -6,6 +6,7 @@
 #include "sdk/PluginSDK.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <optional>
 
 namespace RadarRender {
@@ -21,6 +22,8 @@ struct EntityClassification {
     bool              matched = false;
     bool              hidden = false;
     bool              useRuneshapeColor = false;
+    const RadarData::DisplayRule* matchedRule = nullptr;
+    size_t            matchedRuleIndex = SIZE_MAX;
     EntityMarkerStyle style{};
 };
 
@@ -221,7 +224,8 @@ inline bool MatchesDisplayRule(const RadarData::DisplayRule& rule, const PluginS
 inline EntityClassification ClassifyByRules(const PluginSDK::Entity& e, PluginSDK::Context* ctx,
                                             std::string_view path,
                                             const RadarData::IconTables& icons) {
-    for (const auto& rule : icons.displayRules) {
+    for (size_t ruleIndex = 0; ruleIndex < icons.displayRules.size(); ++ruleIndex) {
+        const auto& rule = icons.displayRules[ruleIndex];
         if (!MatchesDisplayRule(rule, e, path)) continue;
         bool isFriendly = false;
         if (ctx && e.Components.Positioned)
@@ -275,6 +279,8 @@ inline EntityClassification ClassifyByRules(const PluginSDK::Entity& e, PluginSD
         out.hidden = rule.hide || rule.size <= 0.f;
         out.useRuneshapeColor =
             rule.useRuneshapeColor && RadarData::IsRuneshapeColourEligible(rule);
+        out.matchedRule = &rule;
+        out.matchedRuleIndex = ruleIndex;
         out.style = EntityMarkerStyle{rule.markerShape, rule.markerColor.ToImU32(),
                                       std::clamp(rule.size, 1.5f, 22.f), rule.label};
         return out;
