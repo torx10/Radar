@@ -644,12 +644,26 @@ inline RadarData::DisplayRule BuildBuiltinRuleTemplate(const BuiltinRuleRef& ref
     return rule;
 }
 
+inline void DrawRuleEditorRowGap(float height = 6.f) { ImGui::Dummy(ImVec2(0.f, height)); }
+
+inline void DrawRuleEditorTextLabel(const char* label, float width) {
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(label);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(width);
+}
+
 inline void DrawDisplayRuleMatcherFields(RadarData::DisplayRule& rule, bool editable,
                                          bool labelEditable, const char* idPrefix) {
+    constexpr float kIdentityWidth = 260.f;
+    constexpr float kMatchWidth = 368.f;
+    constexpr float kFilterWidth = 92.f;
+
+    ImGui::BeginGroup();
     char nameBuf[256]{};
     strncpy_s(nameBuf, rule.name.c_str(), sizeof(nameBuf) - 1);
     ImGui::BeginDisabled(!editable);
-    ImGui::SetNextItemWidth(250.f);
+    DrawRuleEditorTextLabel("Name", kIdentityWidth);
     if (ImGui::InputTextWithHint((std::string(idPrefix) + "##name").c_str(), "rule name",
                                  nameBuf, sizeof(nameBuf)))
         rule.name = nameBuf;
@@ -659,18 +673,18 @@ inline void DrawDisplayRuleMatcherFields(RadarData::DisplayRule& rule, bool edit
     char labelBuf[256]{};
     strncpy_s(labelBuf, rule.label.c_str(), sizeof(labelBuf) - 1);
     ImGui::BeginDisabled(!labelEditable);
-    ImGui::SetNextItemWidth(250.f);
+    DrawRuleEditorTextLabel("Label", kIdentityWidth);
     if (ImGui::InputTextWithHint((std::string(idPrefix) + "##label").c_str(),
                                  "label (optional)", labelBuf, sizeof(labelBuf)))
         rule.label = labelBuf;
     ImGui::EndDisabled();
-    ImGui::Spacing();
+    DrawRuleEditorRowGap();
 
     std::string matchCsv = JoinCsv(rule.matchTerms);
     char matchBuf[512]{};
     strncpy_s(matchBuf, matchCsv.c_str(), sizeof(matchBuf) - 1);
     ImGui::BeginDisabled(!editable);
-    ImGui::SetNextItemWidth(380.f);
+    DrawRuleEditorTextLabel("Match", kMatchWidth);
     if (ImGui::InputTextWithHint((std::string(idPrefix) + "##match").c_str(),
                                  "metadata terms, comma-separated (blank = any)", matchBuf,
                                  sizeof(matchBuf)))
@@ -682,35 +696,35 @@ inline void DrawDisplayRuleMatcherFields(RadarData::DisplayRule& rule, bool edit
     char modsBuf[512]{};
     strncpy_s(modsBuf, modsCsv.c_str(), sizeof(modsBuf) - 1);
     ImGui::BeginDisabled(!editable);
-    ImGui::SetNextItemWidth(380.f);
+    DrawRuleEditorTextLabel("Mods", kMatchWidth);
     if (ImGui::InputTextWithHint((std::string(idPrefix) + "##mods").c_str(),
                                  "monster mods: aura/buff/mod ids, comma-separated (blank = any)",
                                  modsBuf, sizeof(modsBuf)))
         SplitCsv(modsBuf, rule.mods);
     ImGui::EndDisabled();
-    ImGui::Spacing();
+    DrawRuleEditorRowGap();
 
     if (!rule.subtypes.empty()) {
         const std::string subtypeCsv = JoinCsv(rule.subtypes);
         char subtypeBuf[256]{};
         strncpy_s(subtypeBuf, subtypeCsv.c_str(), sizeof(subtypeBuf) - 1);
         ImGui::BeginDisabled(true);
-        ImGui::SetNextItemWidth(380.f);
+        DrawRuleEditorTextLabel("Subtypes", 380.f);
         ImGui::InputTextWithHint((std::string(idPrefix) + "##subtypes").c_str(),
                                  "entity subtypes", subtypeBuf, sizeof(subtypeBuf));
         ImGui::EndDisabled();
-        ImGui::Spacing();
+        DrawRuleEditorRowGap();
     }
     if (!rule.states.empty()) {
         const std::string stateCsv = JoinCsv(rule.states);
         char stateBuf[256]{};
         strncpy_s(stateBuf, stateCsv.c_str(), sizeof(stateBuf) - 1);
         ImGui::BeginDisabled(true);
-        ImGui::SetNextItemWidth(380.f);
+        DrawRuleEditorTextLabel("States", 380.f);
         ImGui::InputTextWithHint((std::string(idPrefix) + "##states").c_str(),
                                  "entity states", stateBuf, sizeof(stateBuf));
         ImGui::EndDisabled();
-        ImGui::Spacing();
+        DrawRuleEditorRowGap();
     }
 
     ImGui::BeginDisabled(!editable);
@@ -719,32 +733,32 @@ inline void DrawDisplayRuleMatcherFields(RadarData::DisplayRule& rule, bool edit
         ImGui::SetTooltip("System-rule type filters are fixed by Alt Radar's built-in classifier.");
     }
     ImGui::EndDisabled();
-    ImGui::Spacing();
+    DrawRuleEditorRowGap();
 
     ImGui::BeginDisabled(!editable);
-    DrawInlineRuleLabel("Rarity");
+    DrawRuleEditorTextLabel("Rarity", kFilterWidth);
     DrawRuleSelect((std::string(idPrefix) + "##Rarity").c_str(), rule.rarity,
-                   {"Normal", "Magic", "Rare", "Unique"}, 92.f);
+                   {"Normal", "Magic", "Rare", "Unique"}, kFilterWidth);
     ImGui::SameLine();
-    DrawInlineRuleLabel("Reaction");
+    DrawRuleEditorTextLabel("Reaction", kFilterWidth);
     DrawRuleSelect((std::string(idPrefix) + "##Reaction").c_str(), rule.reaction,
-                   {"Hostile", "Friendly"}, 92.f);
+                   {"Hostile", "Friendly"}, kFilterWidth);
     ImGui::SameLine();
-    DrawInlineRuleLabel("Life");
+    DrawRuleEditorTextLabel("Life", 84.f);
     DrawRuleSelect((std::string(idPrefix) + "##Life").c_str(), rule.life, {"Alive", "Dead"}, 84.f);
-    ImGui::SameLine(0.f, 12.f);
-    DrawInlineRuleLabel("Chest");
-    DrawRuleSelect((std::string(idPrefix) + "##Chest").c_str(), rule.chest,
-                   {"Opened", "Unopened"}, 92.f);
     ImGui::SameLine();
-    DrawInlineRuleLabel("POI");
+    DrawRuleEditorTextLabel("Chest", kFilterWidth);
+    DrawRuleSelect((std::string(idPrefix) + "##Chest").c_str(), rule.chest,
+                   {"Opened", "Unopened"}, kFilterWidth);
+    ImGui::SameLine();
+    DrawRuleEditorTextLabel("POI", 74.f);
     DrawRuleSelect((std::string(idPrefix) + "##POI").c_str(), rule.poi, {"Yes", "No"}, 74.f);
     if (!editable && ImGui::IsItemHovered()) {
         ImGui::SetTooltip("System-rule match conditions are fixed by Alt Radar's built-in "
                           "classifier. The action style below is editable.");
     }
     ImGui::EndDisabled();
-    ImGui::Spacing();
+    ImGui::EndGroup();
 }
 
 inline bool BeginRuleHeaderTable(const char* id) {
@@ -868,10 +882,33 @@ inline void DrawRuleColorSourceCombo(const char* id, bool& useRuneshapeColor) {
 
 inline void DrawDisplayRuleStyleRow(bool hideEditable, bool& hideValue,
                                     RadarData::MarkerShape& shape, RadarData::Rgba8& color,
-                                    float& size, bool labelEditable, std::string& label,
+                                    float& size,
                                     bool* rememberUntilZone = nullptr,
                                     bool showRuneshapeColorSource = false,
                                     bool* useRuneshapeColor = nullptr) {
+    ImGui::BeginGroup();
+    DrawRuleEditorTextLabel("Marker", 132.f);
+    DrawMarkerShapeCombo("##Marker", shape);
+    ImGui::SameLine();
+    if (showRuneshapeColorSource && useRuneshapeColor) {
+        DrawRuleEditorTextLabel("Colour Source", 168.f);
+        DrawRuleColorSourceCombo("##ColorSource", *useRuneshapeColor);
+        ImGui::SameLine();
+    }
+    DrawRuleEditorTextLabel("Color", 72.f);
+    ImVec4 colorEdit = color.ToImVec4();
+    if (ImGui::ColorEdit4("##Color", &colorEdit.x,
+                          ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar))
+        color = RadarData::Rgba8::FromImVec4(colorEdit);
+    ImGui::SameLine();
+    DrawRuleEditorTextLabel("Opacity", 82.f);
+    DrawRuleOpacitySlider("##Opacity", color, 82.f);
+    ImGui::SameLine();
+    DrawRuleEditorTextLabel("Size", 66.f);
+    ImGui::DragFloat("##Size", &size, 0.1f, 0.5f, 80.f, "%.1f");
+
+    DrawRuleEditorRowGap(3.f);
+
     ImGui::BeginDisabled(!hideEditable);
     ImGui::Checkbox("Hide", &hideValue);
     ImGui::EndDisabled();
@@ -882,39 +919,8 @@ inline void DrawDisplayRuleStyleRow(bool hideEditable, bool& hideValue,
             ImGui::SetTooltip("When this rule matches an entity, keep showing its last known marker location until you change zone.");
         }
     }
-    ImGui::SameLine();
-    DrawInlineRuleLabel("Marker");
-    ImGui::SetNextItemWidth(132.f);
-    DrawMarkerShapeCombo("##Marker", shape);
-    ImGui::SameLine();
-    if (showRuneshapeColorSource && useRuneshapeColor) {
-        DrawInlineRuleLabel("Colour Source");
-        ImGui::SetNextItemWidth(168.f);
-        DrawRuleColorSourceCombo("##ColorSource", *useRuneshapeColor);
-        ImGui::SameLine();
-    }
-    DrawInlineRuleLabel("Color");
-    ImVec4 colorEdit = color.ToImVec4();
-    ImGui::SetNextItemWidth(72.f);
-    if (ImGui::ColorEdit4("##Color", &colorEdit.x,
-                          ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar))
-        color = RadarData::Rgba8::FromImVec4(colorEdit);
-    ImGui::SameLine();
-    DrawInlineRuleLabel("Opacity");
-    DrawRuleOpacitySlider("##Opacity", color, 82.f);
-    ImGui::SameLine();
-    DrawInlineRuleLabel("Size");
-    ImGui::SetNextItemWidth(66.f);
-    ImGui::DragFloat("##Size", &size, 0.1f, 0.5f, 80.f, "%.1f");
-    ImGui::SameLine();
-    DrawInlineRuleLabel("Label");
-    char labelBuf[256]{};
-    strncpy_s(labelBuf, label.c_str(), sizeof(labelBuf) - 1);
-    ImGui::BeginDisabled(!labelEditable);
-    ImGui::SetNextItemWidth(190.f);
-    if (ImGui::InputTextWithHint("##Label", "label (optional)", labelBuf, sizeof(labelBuf)))
-        label = labelBuf;
-    ImGui::EndDisabled();
+
+    ImGui::EndGroup();
 }
 
 inline RadarData::IconDef* ResolveBuiltinRuleDef(RadarData::IconTables& icons,
@@ -975,6 +981,7 @@ inline void DrawBuiltInRuleRow(const BuiltinRuleRef& ref, RadarData::IconTables&
         EndRuleHeaderTable();
     }
     if (open) {
+        DrawRuleEditorRowGap(2.f);
         RadarData::DisplayRule preview = BuildBuiltinRuleTemplate(ref);
         preview.markerShape = def->markerShape;
         preview.markerColor = def->markerColor;
@@ -984,8 +991,7 @@ inline void DrawBuiltInRuleRow(const BuiltinRuleRef& ref, RadarData::IconTables&
         DrawDisplayRuleMatcherFields(preview, false, true, "##sys");
 
         bool hide = false;
-        DrawDisplayRuleStyleRow(false, hide, def->markerShape, def->markerColor, def->scale,
-                                true, def->label);
+        DrawDisplayRuleStyleRow(false, hide, def->markerShape, def->markerColor, def->scale);
         ImGui::TreePop();
     }
     PopRuleCardStyle();
@@ -1040,10 +1046,12 @@ inline void DrawDisplayRuleRow(size_t index, RadarData::IconTables& icons, RuleS
         return;
     }
     if (open) {
+        DrawRuleEditorRowGap(2.f);
         DrawDisplayRuleMatcherFields(rule, true, true, "##cat");
+        DrawRuleEditorRowGap(2.f);
         const bool runeshapeEligible = RadarData::IsRuneshapeColourEligible(rule);
         DrawDisplayRuleStyleRow(true, rule.hide, rule.markerShape, rule.markerColor, rule.size,
-                                true, rule.label, &rule.rememberUntilZone,
+                                &rule.rememberUntilZone,
                                 runeshapeEligible, &rule.useRuneshapeColor);
         ImGui::TreePop();
     }
